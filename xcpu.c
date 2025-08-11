@@ -26,25 +26,48 @@ void freq() {
 }
 
 void model() {
-    FILE *fp = fopen("/proc/cpuinfo", "r");
+    FILE *fp;
+    char line[256];
+    size_t len;
+    fp = popen("getprop ro.soc.model", "r");
+    if (fp) {
+        if (fgets(line, sizeof(line), fp)) {
+            len = strlen(line);
+            while (len > 0 && (line[len - 1] == '\n' || line[len - 1] == '\r'))
+                line[--len] = '\0';
+            if (line[0] != '\0') {
+                printf("model: %s\n", line);
+                pclose(fp);
+                return;
+            }
+        }
+        pclose(fp);
+    }
+    fp = fopen("/proc/cpuinfo", "r");
     if (!fp) {
         perror("fopen");
         return;
     }
-
-    char line[256];
     while (fgets(line, sizeof(line), fp)) {
-        if (strncmp(line, "model name", 10) == 0) {
+        if (strncmp(line, "model name", 10) == 0 ||
+            strncmp(line, "Hardware", 8) == 0 ||
+            strncmp(line, "Processor", 9) == 0) {
             char *colon = strchr(line, ':');
             if (colon) {
-                printf("model:%s", colon + 1);
+                char *name = colon + 1;
+                while (*name == ' ' || *name == '\t') name++;
+                len = strlen(name);
+                while (len > 0 && (name[len - 1] == '\n' || name[len - 1] == '\r'))
+                    name[--len] = '\0';
+                printf("model: %s\n", name);
                 break;
             }
         }
     }
-
     fclose(fp);
 }
+
+
 
 void core() {
     int count = 0;
